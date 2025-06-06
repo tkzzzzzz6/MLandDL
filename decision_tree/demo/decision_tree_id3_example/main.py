@@ -7,6 +7,7 @@ from sklearn.metrics import confusion_matrix
 from decision_tree_id3 import ID3
 import pandas as pd
 import os
+import graphviz
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
@@ -253,6 +254,80 @@ def print_tree_info(model, title):
     except:
         print(f"{title}: 无法获取树的结构信息")
 
+def visualize_decision_tree(model, feature_names, class_names, title, output_folder, filename):
+    """使用graphviz可视化决策树"""
+    try:
+        # 创建graphviz图形对象
+        dot = graphviz.Digraph(comment=title)
+        dot.attr(rankdir='TB', size='12,8')
+        dot.attr('node', shape='box', style='rounded,filled', fontname='SimHei')
+        dot.attr('edge', fontname='SimHei')
+        
+        # 获取决策树
+        tree = model._ID3__tree
+        
+        def add_nodes_edges(node_id):
+            """递归添加节点和边"""
+            node = tree.get_node(node_id)
+            
+            if node.is_leaf():
+                # 叶子节点 - 显示类别
+                if isinstance(node.data, str):
+                    label = f"类别: {node.data}"
+                else:
+                    label = f"类别: {class_names[node.data] if node.data < len(class_names) else node.data}"
+                dot.node(str(node_id), label, fillcolor='lightgreen')
+            else:
+                # 内部节点 - 显示特征
+                if isinstance(node.data, int) and node.data < len(feature_names):
+                    label = f"特征: {feature_names[node.data]}"
+                else:
+                    label = f"特征 {node.data}"
+                dot.node(str(node_id), label, fillcolor='lightblue')
+                
+                # 添加子节点
+                for child in tree.children(node_id):
+                    add_nodes_edges(child.identifier)
+                    # 添加边，标注特征值
+                    edge_label = str(child.tag)
+                    dot.edge(str(node_id), str(child.identifier), label=edge_label)
+        
+        # 从根节点开始构建图形
+        if tree.root:
+            add_nodes_edges(tree.root)
+        
+        # 保存图形
+        output_path = os.path.join(output_folder, filename)
+        dot.render(output_path, format='png', cleanup=True)
+        print(f"决策树可视化已保存: {output_path}.png")
+        
+        return dot
+        
+    except Exception as e:
+        print(f"决策树可视化失败: {str(e)}")
+        return None
+
+def create_feature_class_names(X_sample, y_sample, dataset_name):
+    """为不同数据集创建特征名和类别名"""
+    if dataset_name == "weather":
+        feature_names = ['天气', '温度', '湿度', '风力']
+        class_names = list(np.unique(y_sample))
+    elif dataset_name == "animal":
+        feature_names = ['大小', '栖息地', '饮食', '社会性']
+        class_names = list(np.unique(y_sample))
+    elif dataset_name == "iris":
+        feature_names = ['花萼长度(离散)', '花萼宽度(离散)']
+        class_names = ['山鸢尾', '变色鸢尾', '维吉尼亚鸢尾']
+    elif dataset_name == "wine":
+        feature_names = ['酒精(离散)', '苹果酸(离散)']
+        class_names = ['类别0', '类别1', '类别2']
+    else:
+        n_features = X_sample.shape[1] if len(X_sample.shape) > 1 else 1
+        feature_names = [f'特征{i}' for i in range(n_features)]
+        class_names = list(np.unique(y_sample))
+    
+    return feature_names, class_names
+
 def main():
     print("ID3决策树 (Decision Tree ID3) 使用示例")
     print("=" * 60)
@@ -272,6 +347,10 @@ def main():
     
     print(f"准确率: {accuracy1:.3f}")
     print_tree_info(id3_1, "决策树信息")
+    
+    # 决策树可视化
+    feature_names1, class_names1 = create_feature_class_names(X1, y1, "weather")
+    visualize_decision_tree(id3_1, feature_names1, class_names1, "天气决策数据集", output_folder, "01_weather_tree")
     
     # 可视化（天气数据集只有4个样本特征，需要特殊处理）
     try:
@@ -300,6 +379,10 @@ def main():
     print(f"测试准确率: {test_accuracy2:.3f}")
     print_tree_info(id3_2, "决策树信息")
     
+    # 决策树可视化
+    feature_names2, class_names2 = create_feature_class_names(X_train2, y_train2, "animal")
+    visualize_decision_tree(id3_2, feature_names2, class_names2, "动物分类数据集", output_folder, "02_animal_tree")
+    
     # 可视化
     visualize_discrete_features(X_test2, y_test2, y_test_pred2, "动物分类数据集", output_folder, "02_animal")
     visualize_confusion_matrix(y_test2, y_test_pred2, "动物分类数据集", output_folder, "02_animal")
@@ -324,6 +407,10 @@ def main():
     print(f"测试准确率: {test_accuracy3:.3f}")
     print_tree_info(id3_3, "决策树信息")
     
+    # 决策树可视化
+    feature_names3, class_names3 = create_feature_class_names(X_disc_train, y_train3, "iris")
+    visualize_decision_tree(id3_3, feature_names3, class_names3, "鸢尾花数据集", output_folder, "03_iris_tree")
+    
     # 可视化
     visualize_discrete_features(X_disc_test, y_test3, y_test_pred3, "鸢尾花数据集", output_folder, "03_iris")
     visualize_confusion_matrix(y_test3, y_test_pred3, "鸢尾花数据集", output_folder, "03_iris")
@@ -347,6 +434,10 @@ def main():
     print(f"训练准确率: {train_accuracy4:.3f}")
     print(f"测试准确率: {test_accuracy4:.3f}")
     print_tree_info(id3_4, "决策树信息")
+    
+    # 决策树可视化
+    feature_names4, class_names4 = create_feature_class_names(X_disc_train4, y_train4, "wine")
+    visualize_decision_tree(id3_4, feature_names4, class_names4, "葡萄酒数据集", output_folder, "04_wine_tree")
     
     # 可视化
     visualize_discrete_features(X_disc_test4, y_test4, y_test_pred4, "葡萄酒数据集", output_folder, "04_wine")
