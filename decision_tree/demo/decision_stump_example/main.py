@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from decision_stump import DecisionStump
 import os
+import graphviz
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
@@ -154,6 +155,70 @@ def visualize_decision_boundary(X, y, stump, title, output_folder, filename):
     plt.close()
     print(f"决策边界图已保存: {save_path}")
 
+def visualize_decision_stump(stump, feature_names, class_names, title, output_folder, filename):
+    """使用graphviz可视化决策桩"""
+    try:
+        # 创建graphviz图形对象
+        dot = graphviz.Digraph(comment=title)
+        dot.attr(rankdir='TB', size='8,6')
+        dot.attr('node', shape='box', style='rounded,filled', fontname='SimHei')
+        dot.attr('edge', fontname='SimHei')
+        
+        # 获取决策桩的参数
+        feature_idx = stump._DecisionStump__feature_index
+        threshold = stump._DecisionStump__threshold
+        direction = stump._DecisionStump__direction
+        
+        # 根节点 - 显示分割条件
+        if feature_idx < len(feature_names):
+            root_label = f"特征: {feature_names[feature_idx]}\\n<= {threshold:.3f}"
+        else:
+            root_label = f"特征 {feature_idx}\\n<= {threshold:.3f}"
+        dot.node('root', root_label, fillcolor='lightblue')
+        
+        # 左子节点（<= threshold）
+        if direction == 1:
+            left_label = f"类别: {class_names[0]}"  # 正类
+            right_label = f"类别: {class_names[1]}"  # 负类
+        else:
+            left_label = f"类别: {class_names[1]}"  # 负类
+            right_label = f"类别: {class_names[0]}"  # 正类
+        
+        dot.node('left', left_label, fillcolor='lightgreen')
+        dot.node('right', right_label, fillcolor='lightgreen')
+        
+        # 添加边
+        dot.edge('root', 'left', label='是')
+        dot.edge('root', 'right', label='否')
+        
+        # 保存图形
+        output_path = os.path.join(output_folder, filename)
+        dot.render(output_path, format='png', cleanup=True)
+        print(f"决策桩可视化已保存: {output_path}.png")
+        
+        return dot
+        
+    except Exception as e:
+        print(f"决策桩可视化失败: {str(e)}")
+        return None
+
+def create_feature_class_names_stump(X_sample, y_sample):
+    """为决策桩创建特征名和类别名"""
+    n_features = X_sample.shape[1] if len(X_sample.shape) > 1 else 1
+    feature_names = [f'特征{i+1}' for i in range(n_features)]
+    
+    # 决策桩通常用于二分类，标签为-1和1
+    unique_labels = np.unique(y_sample)
+    if len(unique_labels) == 2:
+        if -1 in unique_labels and 1 in unique_labels:
+            class_names = ['负类(-1)', '正类(1)']
+        else:
+            class_names = [f'类别{label}' for label in unique_labels]
+    else:
+        class_names = [f'类别{label}' for label in unique_labels]
+    
+    return feature_names, class_names
+
 def calculate_accuracy(y_true, y_pred):
     """计算准确率"""
     return np.mean(y_true == y_pred)
@@ -184,6 +249,10 @@ def main():
     print(f"选择的特征: {stump1._DecisionStump__feature_index}")
     print(f"阈值: {stump1._DecisionStump__threshold:.3f}")
     print(f"方向: {stump1._DecisionStump__direction}")
+    
+    # 决策桩可视化
+    feature_names1, class_names1 = create_feature_class_names_stump(X1, y1)
+    visualize_decision_stump(stump1, feature_names1, class_names1, "简单数据集", output_folder, "01_simple_stump_tree")
     
     # 可视化并保存
     visualize_results(X1, y1, y_pred1, "简单数据集", output_folder, "01_simple_dataset")
@@ -217,6 +286,10 @@ def main():
     print(f"选择的特征: {stump2._DecisionStump__feature_index}")
     print(f"阈值: {stump2._DecisionStump__threshold:.3f}")
     print(f"方向: {stump2._DecisionStump__direction}")
+    
+    # 决策桩可视化
+    feature_names2, class_names2 = create_feature_class_names_stump(X_train, y_train)
+    visualize_decision_stump(stump2, feature_names2, class_names2, "Sklearn数据集", output_folder, "02_sklearn_stump_tree")
     
     # 可视化并保存
     visualize_results(X_train, y_train, y_train_pred, "训练集", output_folder, "02_sklearn_train")
@@ -252,6 +325,10 @@ def main():
     print(f"阈值: {stump3._DecisionStump__threshold:.3f}")
     print(f"方向: {stump3._DecisionStump__direction}")
     
+    # 决策桩可视化
+    feature_names3, class_names3 = create_feature_class_names_stump(X_train3, y_train3)
+    visualize_decision_stump(stump3, feature_names3, class_names3, "乳腺癌数据集", output_folder, "03_breast_cancer_stump_tree")
+    
     # 可视化并保存
     visualize_results(X_train3, y_train3, y_train_pred3, "乳腺癌数据集-训练", output_folder, "03_breast_cancer_train")
     visualize_results(X_test3, y_test3, y_test_pred3, "乳腺癌数据集-测试", output_folder, "03_breast_cancer_test")
@@ -261,7 +338,7 @@ def demonstrate_weighted_training():
     """演示带权重的训练"""
     print("\n4. 带权重的训练示例")
     
-    output_folder = "./output/decision_stump_example"
+    output_folder = "./output"
     
     # 创建数据集
     X, y = create_simple_dataset()
